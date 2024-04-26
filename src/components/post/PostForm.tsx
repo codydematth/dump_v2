@@ -1,6 +1,9 @@
 'use client';
-import {BASE_URL} from '@/uitls/helper';
-import React, {ChangeEvent, FormEvent, useState} from 'react';
+import {PostServices} from '@/utils/apiConnect';
+import Loader from '@/utils/loader';
+import {useRouter} from 'next/navigation';
+import React, {ChangeEvent, useState} from 'react';
+import {toast} from 'react-toastify';
 
 type PostFormData = {
   post_title: string;
@@ -23,6 +26,8 @@ const initialFormData: PostFormData = {
 };
 const PostForm = () => {
   const [formData, setFormData] = useState<PostFormData>(initialFormData);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLInputElement>
   ) => {
@@ -41,27 +46,55 @@ const PostForm = () => {
     }));
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    console.log('Page');
+    setLoading(true);
 
-    const requestOptions: any = {
-      method: 'POST',
-      body: formData,
-      redirect: 'follow',
-    };
+    const data = new FormData();
+    data.append('post_title', formData.post_title);
+    data.append('post_sub_title', formData.post_sub_title);
+    data.append('post_description', formData.post_description);
+    data.append('live_url', formData.live_url);
+    data.append('code_url', formData.code_url);
+    if (formData.image) {
+      data.append('image', formData.image);
+    }
+    formData.post_tags.forEach((tag) => data.append('post_tags', tag));
 
     try {
-      const response = await fetch(`${BASE_URL}/posts/create`, requestOptions);
+      if (!formData.post_title || !formData.post_sub_title || !formData.image) {
+        toast.error('Please fill the required inputs');
+        setLoading(false);
+        return;
+      }
+
+      const response = await PostServices.createPost(data);
       // Handle response as needed
-      console.log(response);
+      console.log('response', response);
+      const res = response.data;
+      if (!res.hasError) {
+        toast.success(res.data.message);
+        router.push('../posts');
+        setFormData({
+          code_url: '',
+          image: null,
+          live_url: '',
+          post_description: '',
+          post_sub_title: '',
+          post_tags: [],
+          post_title: '',
+        });
+      }
+      setLoading(false);
     } catch (error) {
       console.error('Error:', error);
+      setLoading(false);
     }
   };
 
   return (
     <div className='bg-gray-200 border rounded-md p-4'>
-      <form onSubmit={handleSubmit} className='max-w-md mx-auto mt-8'>
+      <div className='max-w-md mx-auto mt-8'>
         <label className='block mb-2'>Post Title</label>
         <input
           type='text'
@@ -127,11 +160,12 @@ const PostForm = () => {
         />
 
         <button
+          onClick={handleSubmit}
           type='submit'
           className='bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded'>
-          Submit
+          {loading ? <Loader color={'#fff'} /> : 'Submit'}
         </button>
-      </form>
+      </div>
     </div>
   );
 };
